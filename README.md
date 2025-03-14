@@ -1,18 +1,18 @@
 # Module pan-tilt-camera 
 
-Provide a description of the purpose of the module and any relevant information.
+A set of components and services for controlling a DIY pan-tilt camera with Viam using servos.
 
 ## Model hipsterbrown:pan-tilt-camera:base-control
 
-Provide a description of the model and any relevant information.
+Control the direction of a camera with a single component by emulating a mobile base. Only the `set_power`, `stop`, and `is_moving` methods are supported.
 
 ### Configuration
 The following attribute template can be used to configure this model:
 
 ```json
 {
-"attribute_1": <float>,
-"attribute_2": <string>
+"pan": <string>,
+"tilt": <string>
 }
 ```
 
@@ -22,29 +22,14 @@ The following attributes are available for this model:
 
 | Name          | Type   | Inclusion | Description                |
 |---------------|--------|-----------|----------------------------|
-| `attribute_1` | float  | Required  | Description of attribute 1 |
-| `attribute_2` | string | Optional  | Description of attribute 2 |
+| `pan` | string  | Required  | The name of the servo component that controls the left/right direction of the camera |
+| `tilt` | string | Required  | The name of the servo component that controls the up/down direction of the camera |
 
 #### Example Configuration
 
 ```json
 {
-  "attribute_1": 1.0,
-  "attribute_2": "foo"
-}
-```
-
-### DoCommand
-
-If your model implements DoCommand, provide an example payload of each command that is supported and the arguments that can be used. If your model does not implement DoCommand, remove this section.
-
-#### Example DoCommand
-
-```json
-{
-  "command_name": {
-    "arg1": "foo",
-    "arg2": 1
-  }
+  "pan": "pan-servo",
+  "tilt": "tilt-servo"
 }
 ```

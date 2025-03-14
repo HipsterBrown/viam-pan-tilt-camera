@@ -1,15 +1,34 @@
+import asyncio
 from dataclasses import dataclass
-from typing import (Any, ClassVar, Dict, Final, List, Mapping, Optional,
-                    Sequence)
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+    cast,
+)
 
 from typing_extensions import Self
-from viam.components.base import *
+from viam.components.base import Base, Vector3
+from viam.components.servo import Servo
+from viam.operations import run_with_operation
 from viam.proto.app.robot import ComponentConfig
 from viam.proto.common import Geometry, ResourceName
 from viam.resource.base import ResourceBase
 from viam.resource.easy_resource import EasyResource
 from viam.resource.types import Model, ModelFamily
-from viam.utils import ValueTypes
+from viam.utils import ValueTypes, struct_to_dict
+
+
+@dataclass(frozen=True)
+class ServoLimit:
+    min: int = 0
+    max: int = 180
 
 
 class BaseControl(Base, EasyResource):
@@ -18,6 +37,15 @@ class BaseControl(Base, EasyResource):
     MODEL: ClassVar[Model] = Model(
         ModelFamily("hipsterbrown", "pan-tilt-camera"), "base-control"
     )
+
+    tilt_limit: ServoLimit
+    pan_limit: ServoLimit
+    pan: Servo
+    tilt: Servo
+    step_amount: int = 10
+
+    state: Union[Literal["moving"], Literal["stopped"]] = "stopped"
+    task_lock = asyncio.Lock()
 
     @classmethod
     def new(
@@ -46,7 +74,15 @@ class BaseControl(Base, EasyResource):
         Returns:
             Sequence[str]: A list of implicit dependencies
         """
-        return []
+        attrs = struct_to_dict(config.attributes)
+
+        pan_servo, tilt_servo = attrs.get("pan", ""), attrs.get("tilt", "")
+        if pan_servo == "" or tilt_servo == "":
+            raise Exception(
+                "`pan` and `tilt` servo component names are required for configuration."
+            )
+
+        return [str(pan_servo), str(tilt_servo)]
 
     def reconfigure(
         self, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]
@@ -57,7 +93,16 @@ class BaseControl(Base, EasyResource):
             config (ComponentConfig): The new configuration
             dependencies (Mapping[ResourceName, ResourceBase]): Any dependencies (both implicit and explicit)
         """
-        return super().reconfigure(config, dependencies)
+        attrs = struct_to_dict(config.attributes)
+
+        pan_servo, tilt_servo = str(attrs.get("pan", "")), str(attrs.get("tilt", ""))
+
+        self.pan = cast(Servo, dependencies.get(Servo.get_resource_name(pan_servo)))
+        self.pan_limit = ServoLimit()
+        self.tilt = cast(Servo, dependencies.get(Servo.get_resource_name(tilt_servo)))
+        self.tilt_limit = ServoLimit()
+
+        return
 
     @dataclass
     class Properties(Base.Properties):
@@ -70,7 +115,7 @@ class BaseControl(Base, EasyResource):
         *,
         extra: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ):
         self.logger.error("`move_straight` is not implemented")
         raise NotImplementedError()
@@ -82,7 +127,7 @@ class BaseControl(Base, EasyResource):
         *,
         extra: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ):
         self.logger.error("`spin` is not implemented")
         raise NotImplementedError()
@@ -94,10 +139,51 @@ class BaseControl(Base, EasyResource):
         *,
         extra: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ):
-        self.logger.error("`set_power` is not implemented")
-        raise NotImplementedError()
+        await self.task_lock.acquire()
+        self.state = "moving"
+        self.logger.debug(f"set_power - linear: {linear}, angular: {angular}")
+        try:
+            current_tilt_position, current_pan_position = await asyncio.gather(
+                self.tilt.get_position(), self.pan.get_position()
+            )
+            tasks = []
+            if linear.y:
+                next_tilt_position = int(
+                    max(
+                        self.tilt_limit.min,
+                        min(
+                            self.tilt_limit.max,
+                            round(linear.y * self.step_amount * -1)
+                            + current_tilt_position,
+                        ),
+                    )
+                )
+                self.logger.debug(f"next_tilt_position: {next_tilt_position}")
+                tasks.append(self.tilt.move(next_tilt_position))
+            if angular.z:
+                next_pan_position = int(
+                    max(
+                        self.pan_limit.min,
+                        min(
+                            self.pan_limit.max,
+                            round(angular.z * self.step_amount) + current_pan_position,
+                        ),
+                    )
+                )
+                self.logger.debug(f"next_pan_position: {next_pan_position}")
+                tasks.append(self.pan.move(next_pan_position))
+
+            if self.state == "stopped":
+                self.logger.debug("set_power operation cancelled. stopping...")
+                await self.stop()
+                return
+
+            await asyncio.gather(*tasks)
+        finally:
+            self.state = "stopped"
+            self.task_lock.release()
 
     async def set_velocity(
         self,
@@ -106,7 +192,7 @@ class BaseControl(Base, EasyResource):
         *,
         extra: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ):
         self.logger.error("`set_velocity` is not implemented")
         raise NotImplementedError()
@@ -116,14 +202,16 @@ class BaseControl(Base, EasyResource):
         *,
         extra: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ):
-        self.logger.error("`stop` is not implemented")
-        raise NotImplementedError()
+        try:
+            await asyncio.gather(self.pan.stop(), self.tilt.stop())
+            self.state = "stopped"
+        finally:
+            self.task_lock.release()
 
     async def is_moving(self) -> bool:
-        self.logger.error("`is_moving` is not implemented")
-        raise NotImplementedError()
+        return self.state == "moving" or self.task_lock.locked()
 
     async def get_properties(
         self, *, timeout: Optional[float] = None, **kwargs
@@ -136,7 +224,7 @@ class BaseControl(Base, EasyResource):
         command: Mapping[str, ValueTypes],
         *,
         timeout: Optional[float] = None,
-        **kwargs
+        **kwargs,
     ) -> Mapping[str, ValueTypes]:
         self.logger.error("`do_command` is not implemented")
         raise NotImplementedError()
@@ -146,4 +234,3 @@ class BaseControl(Base, EasyResource):
     ) -> List[Geometry]:
         self.logger.error("`get_geometries` is not implemented")
         raise NotImplementedError()
-

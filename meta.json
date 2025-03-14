@@ -2,7 +2,7 @@
   "$schema": "https://dl.viam.dev/module.schema.json",
   "module_id": "hipsterbrown:pan-tilt-camera",
   "visibility": "public",
-  "url": "",
+  "url": "https://github.com/HipsterBrown/viam-pan-tilt-camera",
   "description": "Modular base component: base-control",
   "models": [
     {

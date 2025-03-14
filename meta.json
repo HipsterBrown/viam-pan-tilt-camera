@@ -1,0 +1,26 @@
+{
+  "$schema": "https://dl.viam.dev/module.schema.json",
+  "module_id": "hipsterbrown:pan-tilt-camera",
+  "visibility": "public",
+  "url": "",
+  "description": "Modular base component: base-control",
+  "models": [
+    {
+      "api": "rdk:component:base",
+      "model": "hipsterbrown:pan-tilt-camera:base-control",
+      "short_description": "Control a pair of servos like a pan-tilt camera base",
+      "markdown_link": "README.md#model-hipsterbrownpan-tilt-camerabase-control"
+    }
+  ],
+  "entrypoint": "dist/main",
+  "first_run": "",
+  "build": {
+    "build": "./build.sh",
+    "setup": "./setup.sh",
+    "path": "dist/archive.tar.gz",
+    "arch": [
+      "linux/amd64",
+      "linux/arm64"
+    ]
+  }
+}

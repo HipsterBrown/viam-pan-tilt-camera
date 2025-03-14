@@ -1,0 +1,12 @@
+{
+  "module_name": "pan-tilt-camera",
+  "namespace": "hipsterbrown",
+  "language": "python",
+  "resource_type": "component",
+  "resource_subtype": "base",
+  "model_name": "base-control",
+  "enable_cloud_build": true,
+  "initialize_git": false,
+  "generator_version": "0.1.0",
+  "generated_on": "2025-03-14T15:00:55.142363Z"
+}

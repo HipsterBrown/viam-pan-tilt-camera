@@ -16,7 +16,6 @@ from typing import (
 from typing_extensions import Self
 from viam.components.base import Base, Vector3
 from viam.components.servo import Servo
-from viam.operations import run_with_operation
 from viam.proto.app.robot import ComponentConfig
 from viam.proto.common import Geometry, ResourceName
 from viam.resource.base import ResourceBase
@@ -183,7 +182,8 @@ class BaseControl(Base, EasyResource):
             await asyncio.gather(*tasks)
         finally:
             self.state = "stopped"
-            self.task_lock.release()
+            if self.task_lock.locked:
+                self.task_lock.release()
 
     async def set_velocity(
         self,
@@ -208,7 +208,8 @@ class BaseControl(Base, EasyResource):
             await asyncio.gather(self.pan.stop(), self.tilt.stop())
             self.state = "stopped"
         finally:
-            self.task_lock.release()
+            if self.task_lock.locked:
+                self.task_lock.release()
 
     async def is_moving(self) -> bool:
         return self.state == "moving" or self.task_lock.locked()

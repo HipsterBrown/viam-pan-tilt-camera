@@ -8,8 +8,14 @@
     {
       "api": "rdk:component:base",
       "model": "hipsterbrown:pan-tilt-camera:base-control",
-      "short_description": "Control a pair of servos like a pan-tilt camera base",
-      "markdown_link": "README.md#model-hipsterbrownpan-tilt-camerabase-control"
+      "short_description": "control a pair of servos like a pan-tilt camera base",
+      "markdown_link": "readme.md#model-hipsterbrownpan-tilt-camerabase-control"
+    },
+    {
+      "api": "rdk:service:generic",
+      "model": "hipsterbrown:pan-tilt-camera:tracker",
+      "short_description": "Automatically track a configured detected object using a vision service",
+      "markdown_link": "readme.md#model-hipsterbrownpan-tilt-cameratracker"
     }
   ],
   "entrypoint": "dist/main",
